@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game Boy Core Frame</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0f380f;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #game {
+      width: 100% !important;
+      height: 100% !important;
+      position: relative !important;
+    }
+    /* Hide EmulatorJS mobile overlay gamepad & intrusive toolbars inside the LCD bezel */
+    .ejs_virtual_gamepad_parent,
+    .ejs_virtual_gamepad,
+    .ejs_ad_iframe,
+    .ejs_context_menu {
+      display: none !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    .ejs_menu_bar,
+    .ejs_menu_bar_hidden {
+      display: none !important;
+    }
+    #game canvas,
+    .ejs_canvas {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: fill !important;
+      image-rendering: pixelated !important;
+      image-rendering: crisp-edges !important;
+      display: block !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      const romUrl = params.get('rom') || 'roms/Tetris (World) (Rev A).gb';
+      const core = params.get('core') || 'gambatte';
+      const gameName = params.get('name') || romUrl.split('/').pop() || 'GameBoy';
+      const gameId = 'gb_' + gameName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 48);
+
+      window.EJS_player = '#game';
+      window.EJS_gameUrl = romUrl;
+      window.EJS_core = core;
+      window.EJS_gameID = gameId;
+      window.EJS_gameName = gameName;
+      window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+      window.EJS_startOnLoaded = true;
+      window.EJS_color = '#8bac0f';
+      window.EJS_backgroundColor = '#0f380f';
+      window.EJS_volume = params.get('muted') === '1' ? 0 : 0.75;
+      window.EJS_VirtualGamepadSettings = [];
+
+      window.EJS_onGameStart = function () {
+        try {
+          if (params.get('muted') === '1' && window.EJS_emulator?.setVolume) {
+            window.EJS_emulator.setVolume(0);
+          }
+          window.parent?.postMessage({ type: 'gb-started' }, '*');
+        } catch {}
+      };
+
+      // Direct synchronous input bridge called from parent window
+      window.gbSimulateInput = function (btnIndex, isDown) {
+        try {
+          const gm = window.EJS_emulator?.gameManager;
+          if (gm && typeof gm.simulateInput === 'function') {
+            gm.simulateInput(0, btnIndex, isDown ? 1 : 0);
+            return true;
+          }
+        } catch {}
+        return false;
+      };
+
+      window.gbAction = function (action, val) {
+        try {
+          const emu = window.EJS_emulator;
+          const gm = emu?.gameManager;
+          if (!emu || !gm) return false;
+          switch (action) {
+            case 'saveState':
+              gm.simulateInput(0, 24, 1);
+              setTimeout(() => gm.simulateInput(0, 24, 0), 40);
+              return true;
+            case 'loadState':
+              gm.simulateInput(0, 25, 1);
+              setTimeout(() => gm.simulateInput(0, 25, 0), 40);
+              return true;
+            case 'fastForward':
+              emu.isFastForward = !!val;
+              gm.functions?.toggleFastForward?.(val ? 1 : 0);
+              return true;
+            case 'mute':
+              emu.setVolume?.(val ? 0 : 0.75);
+              return true;
+            case 'restart':
+              gm.restart?.();
+              return true;
+          }
+        } catch {}
+        return false;
+      };
+
+      // Forward keyboard events inside iframe to parent unified controller
+      ['keydown', 'keyup'].forEach((evType) => {
+        window.addEventListener(evType, (e) => {
+          if (window.parent && window.parent !== window && typeof window.parent.__gbHandleKeyEvent === 'function') {
+            window.parent.__gbHandleKeyEvent(e, evType === 'keydown');
+          }
+        }, true);
+      });
+
+      const script = document.createElement('script');
+      script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+      document.body.appendChild(script);
+    })();
+  </script>
+</body>
+</html>
