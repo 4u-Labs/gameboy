@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+$_fouruOrigin = $_SERVER['HTTP_ORIGIN'] ?? ''; if ($_fouruOrigin !== '' && (in_array($_fouruOrigin, ['https://4u.ia.br','https://www.4u.ia.br'], true) || str_starts_with($_fouruOrigin, 'chrome-extension://') || str_starts_with($_fouruOrigin, 'http://localhost') || str_starts_with($_fouruOrigin, 'http://127.0.0.1'))) { header('Access-Control-Allow-Origin: ' . $_fouruOrigin); header('Vary: Origin'); }
 
 // Pasta onde estão as ROMs
 $romsFolder = 'roms/';
